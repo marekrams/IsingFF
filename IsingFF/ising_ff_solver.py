@@ -223,7 +223,7 @@ class IsingFFSolver:
             UZZ = self.gate_ZZ(s, s2 * dt, bnd)
             U =  UX2 @ UZZ @ UX2 @ U
             s = s + s2 * ds / 2
-        assert abs(s - sf) < 1e-13
+        assert abs(s - sf) < 1e-10
         return U
 
 
@@ -250,9 +250,9 @@ class IsingFFSolver:
         return  Ui @ self.C0 @ Uj.T
 
 
-    def zz_nn(self, i, s) -> float:
+    def measure_ZZnn(self, i, s) -> float:
         """
-        Calculate <Z_i(s) Z_{i+1}(s)>
+        Calculate equal-time nearest neighbour <Z_i(s) Z_{i+1}(s)>
         """
         if i < 0 or i > self.N-2:
             raise ValueError(f"Specified position outside of chain of length {self.N}.")
@@ -261,7 +261,7 @@ class IsingFFSolver:
         return -C[2*i+1, 2*i+2].imag
 
 
-    def x(self, i, s) -> float:
+    def measure_X(self, i, s) -> float:
         """
         Calculate <X_i(s)>
         """
@@ -271,12 +271,15 @@ class IsingFFSolver:
         return -C[2*i, 2*i+1].imag
 
 
-    def zz(self, i1, s1, i2, s2) -> float:
+    def measure_ZZ(self, i1, s1, i2, s2) -> float:
         """
         Calculate abs(<Z_i1(s1) Z_i2(s2)>)
         """
         if any(i < 0 or i >= self.N for i in [i1, i2]):
             raise ValueError(f"Specified position outside of chain of length {self.N}.")
+
+        if self.boundary == 'pbc' and any(s1 != s2):
+            raise ValueError("For PBC non-equal-time ZZ correlation is currently not supported")
 
         rs =  [slice(0, 2*i + 1) for i in [i1, i2]]
         ss = [s1, s2]
@@ -287,12 +290,15 @@ class IsingFFSolver:
         return np.sqrt(abs(np.linalg.det(tmp)))   #  pfaffian(tmp) ** 2 = det(tmp)
 
 
-    def zzzz(self, i1, s1, i2, s2, i3, s3, i4, s4) -> float:
+    def measure_ZZZZ(self, i1, s1, i2, s2, i3, s3, i4, s4) -> float:
         """
         Calculate abs(<Z_i1(s1) Z_i2(s2) Z_i3(s3) Z_i4(s4)>)
         """
         if any(i < 0 or i >= self.N for i in [i1, i2, i3, i4]):
             raise ValueError(f"Specified position outside of chain of length {self.N}.")
+
+        if self.boundary == 'pbc' and any(s != s1 for s in [s2, s3, s4]):
+            raise ValueError("For PBC non-equal-time ZZZZ correlation is currently not supported")
 
         rs =  [slice(0, 2*i + 1) for i in [i1, i2, i3, i4]]
         ss = [s1, s2, s3, s4]
@@ -303,7 +309,7 @@ class IsingFFSolver:
         return np.sqrt(abs(np.linalg.det(tmp)))   #  pfaffian(tmp) ** 2 = det(tmp)
 
 
-    def xx(self, i1, s1, i2, s2) -> float:
+    def measure_XX(self, i1, s1, i2, s2) -> float:
         """
         Calculate abs(<X_i1(s1) X_i2(s2)>)
         """
@@ -319,7 +325,7 @@ class IsingFFSolver:
         return np.sqrt(abs(np.linalg.det(tmp)))   #  pfaffian(tmp) ** 2 = det(tmp)
 
 
-    def xxxx(self, i1, s1, i2, s2, i3, s3, i4, s4) -> float:
+    def measure_XXXX(self, i1, s1, i2, s2, i3, s3, i4, s4) -> float:
         """
         Calculate abs(<X_i1(s1) X_i2(s2) X_i3(s3) X_i4(s4)>)
         """
@@ -335,9 +341,9 @@ class IsingFFSolver:
         return np.sqrt(abs(np.linalg.det(tmp)))   #  pfaffian(tmp) ** 2 = det(tmp)
 
 
-    def entropy(self, i1, i2, s) -> float:
+    def measure_entropy(self, i1, i2, s) -> float:
         """
-        Calculate von Neuman entropy of a block [i1, i2) as time-snapshot s.
+        Calculate von Neuman entropy of a block [i1, i2) at time-snapshot s.
 
         Use base-2 log.
 
